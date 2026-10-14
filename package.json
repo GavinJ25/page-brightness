@@ -1,0 +1,28 @@
+{
+  "name": "page-brightness",
+  "version": "1.2.0",
+  "description": "Chrome extension: adjust page brightness and warmth per site, with an optional night schedule. Fully local.",
+  "private": true,
+  "license": "MIT",
+  "author": {
+    "name": "Gavin Darius J",
+    "email": "gavindarius2005@gmail.com"
+  },
+  "contributors": [
+    {
+      "name": "Claude (Anthropic)",
+      "url": "https://www.anthropic.com"
+    }
+  ],
+  "scripts": {
+    "test": "node test/run.js",
+    "package": "mkdir -p dist && cd extension && zip -r -X ../dist/page-brightness-v$npm_package_version.zip . -x \"*.DS_Store\""
+  },
+  "devDependencies": {
+    "jsdom": "^26.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GavinJ25/page-brightness.git"
+  }
+}
