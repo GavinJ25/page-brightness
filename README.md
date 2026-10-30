@@ -2,7 +2,8 @@
 
 A small Chrome extension that dims or brightens web pages and adds a warm tint, per site or for all sites, with an optional night schedule. Everything stays on your machine: no network requests, no analytics, no remote code.
 
-![Popup](docs/popup.png)
+<!-- TODO: add a screenshot of the popup, e.g. docs/popup.png -->
+<!-- ![Popup](docs/popup.png) -->
 
 ## Features
 
@@ -48,14 +49,23 @@ Click the toolbar icon, then:
 - Pages may paint at full brightness for a frame before the saved setting loads.
 - Warmth is a CSS sepia filter. It tints the page; it is not a blue-light filter and makes no health claims.
 - The night schedule applies to every site; there is no per-site opt-out yet.
-- Tested against a mocked `chrome` API. Real-browser checks (badge behaviour across navigation, fullscreen video, the night boundary) are worth doing before relying on it.
+- On a page that sets no background on `<html>` or `<body>`, the extension gives `<html>` the default page colour so it can be dimmed too. If a page's background is added later by script, it is picked up within a fraction of a second.
+- During a cross-document view transition (a page navigation animated by the site), elements the site has named for the transition can flash at full brightness for a moment before settling.
+- A page's own `filter` on a fullscreen element, modal dialog or popover is replaced while a setting is active (it comes back when the setting is cleared).
+- Verified in a real Chromium with the unpacked extension: brightness reaching fixed, sticky, popover, modal-dialog and fullscreen elements, pages with and without background colours, and the toolbar badge (`test/browser/`). Not yet verified in a real browser: the popup UI, badge behaviour across back/forward navigation, the night schedule at its boundary, and Firefox.
 
 ## Development
 
 ```
 npm install
-npm test        # 82 checks: jsdom + a mocked chrome API, plus lint rules for the manifest and popup
+npm test        # 101 checks: jsdom + a mocked chrome API, plus lint rules for the manifest and popup
 npm run package # builds dist/page-brightness-v<version>.zip from extension/
+```
+
+Optional real-browser check (needs Python, Playwright and a display; see the header of the file):
+
+```
+python3 test/browser/ext_test.py
 ```
 
 Layout:
@@ -63,7 +73,8 @@ Layout:
 ```
 extension/   the extension itself (load this folder unpacked)
   manifest.json  background.js  content.js  popup.html  popup.js  shared.js  icons/
-test/run.js  test suite
+test/run.js  unit and lint suite (npm test)
+test/browser/  real-Chromium regression test (optional)
 ```
 
 - `shared.js` holds the pure logic (host keys, normalization, schedule, filter string) used by the content script, popup and background worker.
