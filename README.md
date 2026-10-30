@@ -44,15 +44,15 @@ Click the toolbar icon, then:
 
 ## Known limitations
 
-- The extension can't run on `chrome://` pages, the Chrome Web Store or the PDF viewer, and `file://` pages need "Allow access to file URLs" enabled on the extensions page. In those cases the popup says the page can't be adjusted.
+- The extension can't run on `chrome://` pages or the Chrome Web Store; the popup says the page can't be adjusted there. PDFs opened in Chrome (a local file and an online one) were adjusted in testing. Local `file://` pages may need "Allow access to file URLs" turned on in the extension's Details page in `chrome://extensions`.
 - After the extension is updated or reloaded, tabs that were already open keep their last filter but stop following changes until you reload them. If the popup says "This page can't be adjusted" on an ordinary site, reload the tab.
-- Pages may paint at full brightness for a frame before the saved setting loads.
+- On each page load, the page can paint one frame at full brightness before the saved setting is read (extensions can't read their storage synchronously). The extension doesn't work around this: the only fix is to keep a copy of the setting in the site's own `localStorage`, which would leave a readable trace on every dimmed site.
 - Warmth is a CSS sepia filter. It tints the page; it is not a blue-light filter and makes no health claims.
 - The night schedule applies to every site; there is no per-site opt-out yet.
 - On a page that sets no background on `<html>` or `<body>`, the extension gives `<html>` the default page colour so it can be dimmed too. If a page's background is added later by script, it is picked up within a fraction of a second.
 - During a cross-document view transition (a page navigation animated by the site), elements the site has named for the transition can flash at full brightness for a moment before settling.
 - A page's own `filter` on a fullscreen element, modal dialog or popover is replaced while a setting is active (it comes back when the setting is cleared).
-- Verified in a real Chromium with the unpacked extension: brightness reaching fixed, sticky, popover, modal-dialog and fullscreen elements, pages with and without background colours, and the toolbar badge (`test/browser/`). Not yet verified in a real browser: the popup UI, badge behaviour across back/forward navigation, the night schedule at its boundary, and Firefox.
+- Verified in a real Chromium with the unpacked extension (`test/browser/`): brightness reaching fixed, sticky, popover, modal-dialog and fullscreen elements, pages with and without background colours, and the toolbar badge. Checked by hand in Chrome: `chrome://` and Web Store pages are left alone, local and online PDFs, the warmth slider, the night schedule applying to every site, tabs left stale after an extension reload, and keyboard use of the controls. Not yet verified in a real browser: badge behaviour across back/forward navigation, the night schedule at its exact start and end minute, a page's own `filter` on a popover, and Firefox.
 
 ## Development
 
