@@ -1,6 +1,6 @@
 {
   "name": "page-brightness",
-  "version": "1.2.0",
+  "version": "1.2.2",
   "description": "Chrome extension: adjust page brightness and warmth per site, with an optional night schedule. Fully local.",
   "private": true,
   "license": "MIT",
