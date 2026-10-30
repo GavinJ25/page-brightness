@@ -41,6 +41,7 @@ async function content(url, initial, opts = {}) {
   w.setTimeout = (f, d) => { timers.set.push(d); timers.cbs.push(f); return timers.cbs.length; };
   w.clearTimeout = () => { timers.cleared++; };
   w.chrome = m.chrome;
+  if (opts.before) opts.before(w);
   w.eval(read("shared.js")); w.eval(read("content.js")); await wait(20);
   return { w, m, sent, calls, root, timers, clock };
 }
@@ -154,6 +155,76 @@ async function popup(host, initial) {
     w.document.appendChild(w.document.createComment("x")); await wait(15);
     eq("content: applied once <html> appears", realRoot.style.getPropertyValue("filter"), "brightness(0.6)");
   }
+  // Top-layer elements (fullscreen, modal dialogs, popovers) sit outside <html>'s filter, so the
+  // content script mirrors the filter onto them through a constructed stylesheet. jsdom has no
+  // constructable stylesheets, so a small stub records what the script does with it.
+  {
+    const stub = (w) => {
+      w.sheets = [];
+      w.CSSStyleSheet = class { constructor() { this.text = ""; this.replaced = 0; w.sheets.push(this); } replaceSync(t) { this.text = t; this.replaced++; } };
+      w.document.adoptedStyleSheets = [];
+    };
+    let t = await content("https://plain.com/", {}, { before: stub });
+    eq("toplayer: untouched page creates no stylesheet", [t.w.sheets.length, t.w.document.adoptedStyleSheets.length], [0, 0]);
+    t = await content("https://a.com/", { global: { b: 60, w: 20 } }, { before: stub });
+    const sh = t.w.sheets[0];
+    eq("toplayer: one sheet, adopted once", [t.w.sheets.length, t.w.document.adoptedStyleSheets.length], [1, 1]);
+    eq("toplayer: one rule per selector with the same filter (then the canvas rule)",
+      sh.text.split("\n"), [...[":fullscreen", "dialog:modal", ":popover-open"].map((x) => x + " { filter: sepia(0.2) brightness(0.6) !important; }"), "html { background-color: Canvas; }"]);
+    await t.m.chrome.storage.local.set({ global: { b: 50, w: 0 } });
+    eq("toplayer: rules follow the setting", sh.text.includes("brightness(0.5)") && !sh.text.includes("sepia"), true);
+    eq("toplayer: canvas rule survives a setting change", sh.text.endsWith("html { background-color: Canvas; }"), true);
+    const reps = sh.replaced;
+    Object.defineProperty(t.w.document, "hidden", { configurable: true, get: () => false }); // jsdom reports hidden=true
+    t.w.document.dispatchEvent(new t.w.Event("visibilitychange"));
+    eq("toplayer: unchanged rules are not rewritten", sh.replaced, reps);
+    t.w.document.adoptedStyleSheets = [];   // a page that reassigns adoptedStyleSheets
+    t.w.document.dispatchEvent(new t.w.Event("visibilitychange"));
+    eq("toplayer: re-adopted if the page drops it", t.w.document.adoptedStyleSheets.length, 1);
+    await t.m.chrome.storage.local.remove("global");
+    eq("toplayer: rules emptied when the setting is removed", sh.text, "");
+    eq("toplayer: page's own styles untouched while idle (no rules left)", t.w.document.adoptedStyleSheets[0].text, "");
+    // a browser without constructable stylesheets must not break the <html> filter
+    t = await content("https://a.com/", { global: { b: 60, w: 0 } }, { before: (w) => { w.CSSStyleSheet = class { constructor() { throw new Error("unsupported"); } }; w.document.adoptedStyleSheets = []; } });
+    eq("toplayer: stylesheet failure leaves the <html> filter working", t.root.style.getPropertyValue("filter"), "brightness(0.6)");
+  }
+
+  // Canvas background: the default page background is painted behind <html>, outside its filter, so a
+  // page with no background on <html> or <body> shows white at any brightness. The content script
+  // gives <html> the canvas colour, but only in that case. (Pixel-level proof: test/browser.)
+  {
+    const stub = (w) => {
+      w.sheets = [];
+      w.CSSStyleSheet = class { constructor() { this.text = ""; w.sheets.push(this); } replaceSync(t) { this.text = t; } };
+      w.document.adoptedStyleSheets = [];
+    };
+    const CANVAS = "html { background-color: Canvas; }";
+    const has = (t) => t.w.sheets[0] && t.w.sheets[0].text.includes(CANVAS);
+    let t = await content("https://a.com/", { global: { b: 60, w: 0 } }, { before: stub });
+    eq("canvas: no background anywhere => canvas rule on", has(t), true);
+    t = await content("https://a.com/", { global: { b: 60, w: 0 } }, { before: (w) => { stub(w); w.document.addEventListener("DOMContentLoaded", () => {}); w.document.documentElement.style.background = "#fff"; } });
+    eq("canvas: <html> has a background => rule off", has(t), false);
+    t = await content("https://a.com/", { global: { b: 60, w: 0 } }, { before: (w) => { stub(w); w.document.body.style.background = "#eee"; } });
+    eq("canvas: <body> has a background => rule off (propagation untouched)", has(t), false);
+    t = await content("https://a.com/", { global: { b: 60, w: 0 } }, { before: (w) => { stub(w); w.document.body.style.backgroundImage = "linear-gradient(#000,#fff)"; } });
+    eq("canvas: <body> has a background image => rule off", has(t), false);
+    // the page changes its mind after load (theme toggle, late CSS)
+    t = await content("https://a.com/", { global: { b: 60, w: 0 } }, { before: stub });
+    const flush = async () => { await wait(10); t.timers.cbs.splice(0).forEach((f) => f()); };  // the re-check is debounced; content() records timers
+    t.w.document.body.style.background = "#111"; await flush();
+    eq("canvas: body gains a background later => rule removed", has(t), false);
+    t.w.document.body.style.background = ""; await flush();
+    eq("canvas: body loses it again => rule returns", has(t), true);
+    // only while a filter is active
+    await t.m.chrome.storage.local.remove("global"); await wait(20);
+    eq("canvas: setting removed => no canvas rule", t.w.sheets[0].text, "");
+    t = await content("https://plain.com/", {}, { before: stub });
+    eq("canvas: untouched page => no sheet at all", t.w.sheets.length, 0);
+    // while the document is still parsing, styles aren't reliable: don't guess
+    t = await content("https://a.com/", { global: { b: 60, w: 0 } }, { before: (w) => { stub(w); Object.defineProperty(w.document, "readyState", { configurable: true, get: () => "loading" }); } });
+    eq("canvas: still loading => rule not applied yet", has(t), false);
+  }
+
   const S2 = { on: true, start: "21:00", end: "07:00", b: 70, w: 30 };
   r = await content("https://a.com/", { schedule: S2 }, { now: new Date(2026, 9, 7, 20, 59, 30).getTime() });
   eq("content: tick aligned to minute boundary", [r.timers.set.length, r.timers.set[0], r.calls], [1, 30050, []]);
