@@ -1,0 +1,20 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+ body{margin:0;background:#fff;height:2000px;font:16px sans-serif}
+ .box{position:absolute;width:120px;height:60px;background:#fff;border:0;padding:0;margin:0}
+ #fixed{position:fixed;left:0;top:0;width:100%;height:50px;background:#fff}
+ #sticky{position:sticky;top:60px;height:50px;background:#fff}
+ #pop{position:fixed;inset:auto;left:200px;top:300px;width:120px;height:60px;background:#fff;border:0;padding:0;margin:0;overflow:hidden;filter:grayscale(1)}
+ #dlg{position:fixed;left:400px;top:300px;width:120px;height:60px;background:#fff;border:0;padding:0;margin:0}
+ #dlg::backdrop{background:transparent}
+ #fs{width:200px;height:100px;background:#fff}
+ #nonmodal{position:absolute;left:600px;top:300px;width:120px;height:60px;background:#fff;border:0;padding:0;margin:0}
+ #bd{position:fixed;left:0;top:400px;width:100%;height:50px;background:#fff;backdrop-filter:blur(2px)}
+ #wc{position:fixed;left:0;top:460px;width:100%;height:50px;background:#fff;will-change:transform}
+</style></head><body>
+<div id="fixed">fixed</div><div id="sticky">sticky</div>
+<div id="pop" popover="manual">popover</div>
+<dialog id="dlg">modal dialog</dialog>
+<dialog id="nonmodal">nonmodal</dialog>
+<div id="bd">backdrop-filter</div><div id="wc">will-change</div>
+<div id="fs" style="position:absolute;left:800px;top:300px">fullscreen target</div>
+</body></html>
